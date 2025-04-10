@@ -51,6 +51,8 @@
 
 #include "httpsrv.h"
 #include "lwip/apps/mdns.h"
+#include "mqtt_freertos.h"
+#include "lwip/apps/mqtt.h"
 
 /*******************************************************************************
  * Prototypes
@@ -474,6 +476,7 @@ static void main_task(void *arg)
     /* Main Loop */
     while (1)
     {
+
         /* The SetBoardTo<state> function will configure the board Wifi to that given state.
          * After that, this task will suspend itself. It will remain suspended until it is time
          * to switch the state again. Uppon resuming, it will clean up the current state.
@@ -487,7 +490,8 @@ static void main_task(void *arg)
                 http_server_enable_mdns(netif_default, "wifi-http-Miguel");
                 http_server_print_ip_cfg(netif_default);
 
-                /* Suspend here until its time to swtich back to AP */
+
+                /* Suspend here until it's time to switch back to AP */
                 vTaskSuspend(NULL);
                 CleanUpClient();
                 break;
@@ -495,7 +499,8 @@ static void main_task(void *arg)
             default:
                 SetBoardToAP();
                 http_server_enable_mdns(netif_default, "wifi-http-Miguel");
-                /* Suspend here until its time to stop the AP */
+
+                /* Suspend here until it's time to stop the AP */
                 vTaskSuspend(NULL);
                 CleanUpAP();
         }
