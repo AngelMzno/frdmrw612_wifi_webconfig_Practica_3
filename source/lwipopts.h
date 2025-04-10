@@ -37,6 +37,11 @@
  */
 #define NO_SYS 0
 
+/* Enable IGMP and MDNS */
+#define LWIP_IGMP                  1
+#define LWIP_MDNS_RESPONDER        1
+#define LWIP_NUM_NETIF_CLIENT_DATA (LWIP_MDNS_RESPONDER)
+
 #define CONFIG_NETWORK_HIGH_PERF 1
 
 #define MAX_SOCKETS_TCP           8
@@ -73,7 +78,7 @@ void sys_mark_tcpip_thread(void);
 #define TCPIP_THREAD_NAME      "tcp/ip"
 #define TCPIP_THREAD_STACKSIZE 768
 #define TCPIP_THREAD_PRIO      2
-#define TCPIP_MBOX_SIZE        32
+#define TCPIP_MBOX_SIZE        64
 
 /**
  * DEFAULT_RAW_RECVMBOX_SIZE: The mailbox size for the incoming packets on a
@@ -103,7 +108,7 @@ void sys_mark_tcpip_thread(void);
  */
 #define DEFAULT_ACCEPTMBOX_SIZE 12
 
-#define DEFAULT_THREAD_STACKSIZE 200
+#define DEFAULT_THREAD_STACKSIZE 400
 #define DEFAULT_THREAD_PRIO      1
 
 #define LWIP_DEBUG       0
@@ -204,7 +209,11 @@ void sys_mark_tcpip_thread(void);
  * If the application sends a lot of data out of ROM (or other static memory),
  * this should be set high.
  */
+#ifdef CONFIG_NETWORK_HIGH_PERF
+#define MEMP_NUM_PBUF 20
+#else
 #define MEMP_NUM_PBUF 10
+#endif
 
 /**
  * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
@@ -229,18 +238,37 @@ void sys_mark_tcpip_thread(void);
  * for incoming packets.
  * (only needed if you use tcpip.c)
  */
+#ifdef CONFIG_NETWORK_HIGH_PERF
+#define MEMP_NUM_TCPIP_MSG_INPKT 32
+#else
 #define MEMP_NUM_TCPIP_MSG_INPKT 16
+#endif
+
+/** MEMP_NUM_TCPIP_MSG_*: the number of struct tcpip_msg, which is used
+   for sequential API communication and incoming packets. Used in
+   src/api/tcpip.c. */
+#ifdef CONFIG_NETWORK_HIGH_PERF
+#define MEMP_NUM_TCPIP_MSG_API 16
+#else
+#define MEMP_NUM_TCPIP_MSG_API 8
+#endif
+
 /**
  * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.
  * (requires NO_SYS==0)
  */
-#define MEMP_NUM_SYS_TIMEOUT 12
+#define MEMP_NUM_SYS_TIMEOUT 17
 
 /**
  * MEMP_NUM_NETBUF: the number of struct netbufs.
  * (only needed if you use the sequential API, like api_lib.c)
  */
+#ifdef CONFIG_NETWORK_HIGH_PERF
+#define MEMP_NUM_NETBUF 32
+#else
 #define MEMP_NUM_NETBUF 16
+#endif
+
 /**
  * MEMP_NUM_NETCONN: the number of struct netconns.
  * (only needed if you use the sequential API, like api_lib.c)
@@ -320,6 +348,13 @@ void sys_mark_tcpip_thread(void);
  */
 #define LWIP_RAW 1
 
+/* Enable IPv4 Auto IP	*/
+#ifdef CONFIG_AUTOIP
+#define LWIP_AUTOIP                 1
+#define LWIP_DHCP_AUTOIP_COOP       1
+#define LWIP_DHCP_AUTOIP_COOP_TRIES 5
+#endif
+
 /*
    ---------------------------------------
    ---------- IPv6 options ---------------
@@ -397,6 +432,8 @@ void sys_mark_tcpip_thread(void);
 /**
  * DNS related options, revisit later to fine tune.
  */
+#define LWIP_MDNS_RESPONDER 1
+
 #define LWIP_DNS            1
 #define DNS_TABLE_SIZE      2  // number of table entries, default 4
 #define DNS_MAX_NAME_LENGTH 64 // max. name length, default 256

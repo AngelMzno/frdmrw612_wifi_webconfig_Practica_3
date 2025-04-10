@@ -26,6 +26,32 @@
 
 #include "FreeRTOS.h"
 
+
+#include "lwip/opt.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <ctype.h>
+#ifndef __REDLIB__
+#include <inttypes.h>
+#else
+#define PRIu32 "u"
+#endif
+
+#include "lwip/netif.h"
+#include "lwip/sys.h"
+#include "lwip/arch.h"
+#include "lwip/api.h"
+#include "lwip/tcpip.h"
+#include "lwip/ip.h"
+#include "lwip/netifapi.h"
+#include "lwip/sockets.h"
+#include "netif/etharp.h"
+
+#include "httpsrv.h"
+#include "lwip/apps/mdns.h"
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -38,6 +64,8 @@ static uint32_t SetBoardToClient();
 static uint32_t SetBoardToAP();
 static uint32_t CleanUpAP();
 static uint32_t CleanUpClient();
+
+static char s_mdns_hostname[65] = "";
 
 /*******************************************************************************
  * Definitions
@@ -431,6 +459,8 @@ static void main_task(void *arg)
 
     WC_DEBUG("[i] Successfully initialized Wi-Fi module\r\n");
 
+    
+
     /* Start WebServer */
     if (xTaskCreate(http_srv_task, "http_srv_task", HTTPD_STACKSIZE, NULL, HTTPD_PRIORITY, NULL) != pdPASS)
     {
@@ -454,6 +484,9 @@ static void main_task(void *arg)
         {
             case WIFI_STATE_CLIENT:
                 SetBoardToClient();
+                http_server_enable_mdns(netif_default, "wifi-http-Miguel");
+                http_server_print_ip_cfg(netif_default);
+
                 /* Suspend here until its time to swtich back to AP */
                 vTaskSuspend(NULL);
                 CleanUpClient();
@@ -461,6 +494,7 @@ static void main_task(void *arg)
             case WIFI_STATE_AP:
             default:
                 SetBoardToAP();
+                http_server_enable_mdns(netif_default, "wifi-http-Miguel");
                 /* Suspend here until its time to stop the AP */
                 vTaskSuspend(NULL);
                 CleanUpAP();
@@ -635,4 +669,31 @@ int main(void)
     /* Should not reach this statement */
     for (;;)
         ;
+}
+
+static void http_srv_txt(struct mdns_service *service, void *txt_userdata)
+{
+    mdns_resp_add_service_txtitem(service, "path=/", 6);
+}
+
+
+void http_server_enable_mdns(struct netif *netif, const char *mdns_hostname)
+{
+    LOCK_TCPIP_CORE();
+    mdns_resp_init();
+    mdns_resp_add_netif(netif, mdns_hostname);
+    mdns_resp_add_service(netif, mdns_hostname, "_http", DNSSD_PROTO_TCP, 80, http_srv_txt, NULL);
+    UNLOCK_TCPIP_CORE();
+
+    (void)strncpy(s_mdns_hostname, mdns_hostname, sizeof(s_mdns_hostname) - 1);
+    s_mdns_hostname[sizeof(s_mdns_hostname) - 1] = '\0'; // Make sure string will be always terminated.
+}
+
+void http_server_print_ip_cfg(struct netif *netif)
+{
+    PRINTF("\r\n***********************************************************\r\n");
+    PRINTF(" HTTP Server\r\n");
+    PRINTF("***********************************************************\r\n");
+    PRINTF(" mDNS hostname    : %s\r\n", s_mdns_hostname);
+    PRINTF("***********************************************************\r\n");
 }
