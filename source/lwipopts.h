@@ -257,7 +257,7 @@ void sys_mark_tcpip_thread(void);
  * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.
  * (requires NO_SYS==0)
  */
-#define MEMP_NUM_SYS_TIMEOUT 17
+#define MEMP_NUM_SYS_TIMEOUT 25
 
 /**
  * MEMP_NUM_NETBUF: the number of struct netbufs.

@@ -22,10 +22,10 @@
 #include "webconfig.h"
 #include "cred_flash_storage.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "FreeRTOS.h"
-
 
 #include "lwip/opt.h"
 
@@ -386,7 +386,8 @@ static void LinkStatusChangeCallback(bool linkState)
         /* -------- LINK LOST -------- */
         /* DO SOMETHING */
         PRINTF("-------- LINK LOST --------\r\n");
-    }
+       // reset_saved_wifi_credentials();
+       }
     else
     {
         /* -------- LINK REESTABLISHED -------- */
@@ -395,13 +396,41 @@ static void LinkStatusChangeCallback(bool linkState)
     }
 }
 
+// Agregar configuración de pines para LEDs
+#define BLUE_LED_PIN 0U
+#define RED_LED_PIN 1U
+#define GREEN_LED_PIN 12U
+
+// Inicialización de LEDs
+static void init_leds(void)
+{
+    gpio_pin_config_t led_config = {
+        kGPIO_DigitalOutput,
+        0,
+    };
+
+    GPIO_PortInit(GPIO, 0U);
+    GPIO_PinInit(GPIO, 0U, BLUE_LED_PIN, &led_config);
+    GPIO_PinInit(GPIO, 0U, RED_LED_PIN, &led_config);
+    GPIO_PinInit(GPIO, 0U, GREEN_LED_PIN, &led_config);
+
+    GPIO_PinWrite(GPIO, 0U, BLUE_LED_PIN, 1U);
+    GPIO_PinWrite(GPIO, 0U, RED_LED_PIN, 1U);
+    GPIO_PinWrite(GPIO, 0U, GREEN_LED_PIN, 1U);
+}
+
+static void start_mqtt_client(struct netif *netif)
+{
+    PRINTF("Starting MQTT client...\r\n");
+    mqtt_freertos_run_thread(netif);
+}
+
 /*!
  * @brief The main task function
  */
 static void main_task(void *arg)
 {
     uint32_t result = 1;
-
     PRINTF(
         "\r\n"
         "Starting webconfig DEMO\r\n");
@@ -445,6 +474,9 @@ static void main_task(void *arg)
     /* Initialize Wi-Fi board */
     WC_DEBUG("[i] Initializing Wi-Fi connection... \r\n");
 
+
+    init_leds(); // Inicializar LEDs
+
     result = WPL_Init();
     if (result != WPLRET_SUCCESS)
     {
@@ -482,15 +514,14 @@ static void main_task(void *arg)
          * to switch the state again. Uppon resuming, it will clean up the current state.
          * Every time the Wi-Fi state changes, this loop will perform an iteration switching back
          * and fourth between the two states as required.
-         */
-        switch (g_BoardState.wifiState)
+         */        
+         switch (g_BoardState.wifiState)
         {
             case WIFI_STATE_CLIENT:
                 SetBoardToClient();
                 http_server_enable_mdns(netif_default, "wifi-http-Miguel");
-                http_server_print_ip_cfg(netif_default);
-
-
+                /* Start the MQTT client */
+                start_mqtt_client(netif_default);
                 /* Suspend here until it's time to switch back to AP */
                 vTaskSuspend(NULL);
                 CleanUpClient();
@@ -498,8 +529,6 @@ static void main_task(void *arg)
             case WIFI_STATE_AP:
             default:
                 SetBoardToAP();
-                http_server_enable_mdns(netif_default, "wifi-http-Miguel");
-
                 /* Suspend here until it's time to stop the AP */
                 vTaskSuspend(NULL);
                 CleanUpAP();
@@ -652,6 +681,7 @@ static uint32_t CleanUpClient()
 
     return 0;
 }
+
 /*!
  * @brief Main function.
  */
@@ -681,7 +711,6 @@ static void http_srv_txt(struct mdns_service *service, void *txt_userdata)
     mdns_resp_add_service_txtitem(service, "path=/", 6);
 }
 
-
 void http_server_enable_mdns(struct netif *netif, const char *mdns_hostname)
 {
     LOCK_TCPIP_CORE();
@@ -694,11 +723,4 @@ void http_server_enable_mdns(struct netif *netif, const char *mdns_hostname)
     s_mdns_hostname[sizeof(s_mdns_hostname) - 1] = '\0'; // Make sure string will be always terminated.
 }
 
-void http_server_print_ip_cfg(struct netif *netif)
-{
-    PRINTF("\r\n***********************************************************\r\n");
-    PRINTF(" HTTP Server\r\n");
-    PRINTF("***********************************************************\r\n");
-    PRINTF(" mDNS hostname    : %s\r\n", s_mdns_hostname);
-    PRINTF("***********************************************************\r\n");
-}
+
